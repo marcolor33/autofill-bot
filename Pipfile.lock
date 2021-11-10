@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "02e945d67fd29c484ce0c5bc5f16823db35163fe57b316938d1cb97101a23643"
+            "sha256": "b271eda6bbb29f1c793d83254ead3bb8f6ef92262f6219f010a4c2b6656ba65b"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -16,6 +16,13 @@
         ]
     },
     "default": {
+        "2captcha-python": {
+            "hashes": [
+                "sha256:57a68523240ec91f280bf6fa72ad2dc673009e5c40d5d89ca5d352a0f8c8f83f"
+            ],
+            "index": "pypi",
+            "version": "==1.1.0"
+        },
         "async-generator": {
             "hashes": [
                 "sha256:01c7bf666359b4967d2cda0000cc2e4af16a0ae098cbffcb8472fb9e8ad6585b",
@@ -211,6 +218,14 @@
             ],
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4, 3.5'",
             "version": "==2.26.0"
+        },
+        "schedule": {
+            "hashes": [
+                "sha256:617adce8b4bf38c360b781297d59918fbebfb2878f1671d189f4f4af5d0567a4",
+                "sha256:e6ca13585e62c810e13a08682e0a6a8ad245372e376ba2b8679294f377dfc8e4"
+            ],
+            "index": "pypi",
+            "version": "==1.1.0"
         },
         "selenium": {
             "hashes": [

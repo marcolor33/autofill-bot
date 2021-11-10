@@ -8,7 +8,9 @@ pydub = "==0.25.1"
 selenium = "*"
 beautifulsoup4 = "*"
 webdriver_manager = "*"
+schedule = "*"
 speechrecognition = "==3.8.1"
+2captcha-python = "*"
 urllib3 = "==1.26.6"
 
 [dev-packages]

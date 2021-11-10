@@ -22,9 +22,78 @@ from selenium.webdriver.common.keys import Keys
 # custom patch libraries
 from patch import download_latest_chromedriver, webdriver_folder_name
 
-def trySolveRecaptcha(driver):
 
-    print("trySolveRecaptcha")
+import schedule
+import threading
+import time
+
+from twocaptcha import TwoCaptcha
+
+from multiprocessing import Process, Manager, Value
+
+
+recaptcha_worker_list = []
+recaptcha_token_list = []
+
+def recaptchaWorker(recaptcha_token_list):
+    print("recaptchaWorker started")
+    while True:
+        print("recaptchaWorker working")
+
+        start = time.time()
+
+
+        url = "https://pbqc.quotabooking.gov.hk/booking/hk/index_tc.jsp"
+        siteKey = "6Lcmk0kcAAAAAG-dUsJJUbEOf2Ph2ZdGLMCojehi"
+
+        API_KEY = "be9f08edcbdaafe723d76dd8b17ad0df"
+        config = {
+                'server':           '2captcha.com', # can be also set to 'rucaptcha.com'
+                'apiKey':           API_KEY,
+                'defaultTimeout':    120,
+                'recaptchaTimeout':  600,
+                'pollingInterval':   5,
+            }
+        
+        solver = TwoCaptcha(**config)
+
+        try:
+            result = solver.recaptcha(
+                sitekey=siteKey,
+                url=url,
+                invisible=0,
+                enterprise=1
+            )
+
+        except Exception as e:
+            print(e)
+            print("recaptchaWorker failed")
+
+        else:
+
+            end = time.time()
+            print("recaptchaWorker success")
+            result['startAt'] = start
+            result['endAt'] = end
+            result['timeSpent'] = end - start
+            recaptcha_token_list.append(result)
+
+        time.sleep(1)
+
+def tryGetRecaptchaToken():
+
+    while True:
+        if (len(recaptcha_token_list) > 0 ):
+            first = recaptcha_token_list.pop()
+            return first['code']
+        
+        print("no recaptcha token available now")
+        time.sleep(1)
+
+
+def trySolveRecaptchaThroughAudio(driver):
+
+    print("trySolveRecaptchaThroughAudio")
     # main program
     # auto locate recaptcha frames
     frames = driver.find_elements_by_tag_name("iframe")
@@ -111,7 +180,8 @@ def trySolveRecaptcha(driver):
     driver.find_element_by_id("audio-response").send_keys(Keys.ENTER)
     driver.switch_to.default_content()
 
-def init(url):
+
+def initDriver():
     while True:
         try:
             # create chrome driver
@@ -123,8 +193,6 @@ def init(url):
             chrome_options.add_argument("--incognito")
 
             driver = webdriver.Chrome(chrome_path, chrome_options=chrome_options)
-            driver.implicitly_wait(5)
-            driver.get(url)
             return driver
         except Exception:
             # patch chromedriver if not available or outdated
@@ -142,19 +210,26 @@ def init(url):
                     "https://chromedriver.chromium.org/downloads"
                 )
 
-def is_visible(element):
+def isElementVisible(element):
     location = element.location
     size = element.size
     w, h = size['width'], size['height']
     
     return h > 0
 
+
+
+def ScheduleGoToPage(driver):
+    while True:
+        print("waiting to redirect")
+
+
 def waitUntilLanding(driver):
   while True:
 
     try:
         targetElement = driver.find_element_by_id("step_1_other_documentId")
-        if is_visible(targetElement):
+        if isElementVisible(targetElement):
             print("landed")
             return
     except:
@@ -166,7 +241,7 @@ def waitUntilPage2(driver):
   while True:
     targetElement = driver.find_element_by_id("pics_consent")
 
-    if is_visible(targetElement):
+    if isElementVisible(targetElement):
         print("now in page 2")
         return
     print("still in  page 1")
@@ -176,21 +251,22 @@ def waitUntilFinalPage(driver):
     while True:
         targetElement = driver.find_element_by_id("user_note")
 
-        if is_visible(targetElement):
+        if isElementVisible(targetElement):
             print("now in final page")
             return
         print("still in  page 3")
         time.sleep(0.5)
 
-def main():
+
+def tryClickElement(driver, element):
+    driver.execute_script("arguments[0].click();", element)
+
+def process_main():
     options = Options()
     options.add_argument("--disable-notifications")
 
-    # normal queueing url
-    landing_url = "https://pbqc.quotabooking.gov.hk/booking/index_hk_tc.jsp"
-
     # skip queue url
-    quick_landing_url = "https://pbqc.quotabooking.gov.hk/booking/hk/index_tc.jsp"
+    url = "https://pbqc.quotabooking.gov.hk/booking/hk/index_tc.jsp"
 
     # hardcode info
     name = "Babon Myra cruzdo"
@@ -206,10 +282,12 @@ def main():
     can_cantonese = False
     can_putonghua = False
 
-    # init
+    # init driver
+    driver = initDriver()
 
-    #  driver = init(landing_url)
-    driver = init(quick_landing_url)
+
+    driver.implicitly_wait(5)
+    driver.get(url)
 
 
     waitUntilLanding(driver)
@@ -225,28 +303,23 @@ def main():
     passport_no_input = driver.find_element_by_id("step_1_other_documentId")
     passport_no_input.send_keys(passport_no)
 
-    # # Warning: is not 100% work, may be blocked.
-    # trySolveRecaptcha(driver)
-    # time.sleep(1)
-    # passport_no_input.send_keys(Keys.RETURN)
+
 
     waitUntilPage2(driver)
 
     # page 2
-
     pics_consent_input = driver.find_element_by_id("pics_consent")
-    driver.execute_script("arguments[0].click();", pics_consent_input)
-
+    tryClickElement(driver, pics_consent_input)
 
     nr_consent_input = driver.find_element_by_id("nr_consent")
-    driver.execute_script("arguments[0].click();", nr_consent_input)
+    tryClickElement(driver, nr_consent_input)
 
     gr_consent_input = driver.find_element_by_id("gr_consent")
-    driver.execute_script("arguments[0].click();", gr_consent_input)
+    tryClickElement(driver, gr_consent_input)
 
     # next_page
     next_button_2 = driver.find_element_by_id("note_2_confirm")
-    driver.execute_script("arguments[0].click();", next_button_2)
+    tryClickElement(driver, next_button_2)
 
     time.sleep(0.5)
 
@@ -266,17 +339,17 @@ def main():
     # english
     can_english_element_id = "step_2_communicate_in_english_yes" if can_english  else "step_2_communicate_in_english_no"
     can_english_input = driver.find_element_by_id(can_english_element_id)
-    driver.execute_script("arguments[0].click();", can_english_input)
+    tryClickElement(driver, can_english_input)
 
     # cantonese
     can_cantonese_element_id = "step_2_communicate_in_cantonese_yes " if can_cantonese  else "step_2_communicate_in_cantonese_no"
     can_cantonese_input = driver.find_element_by_id(can_cantonese_element_id)
-    driver.execute_script("arguments[0].click();", can_cantonese_input)
+    tryClickElement(driver, can_cantonese_input)
 
     # putonghua
     can_putonghua_element_id = "step_2_communicate_in_putonghua_yes " if can_putonghua  else "step_2_communicate_in_putonghua_no"
     can_putonghua_input = driver.find_element_by_id(can_putonghua_element_id)
-    driver.execute_script("arguments[0].click();", can_putonghua_input)
+    tryClickElement(driver, can_putonghua_input)
 
     # email 
     step_2_email_of_contact_person_input = driver.find_element_by_id("step_2_email_of_contact_person")
@@ -300,21 +373,71 @@ def main():
     for index, input in enumerate(input_list):
         disabled = input.get_attribute("disabled")
         if disabled != 'true':
-            driver.execute_script("arguments[0].click();", input)
+            tryClickElement(driver, input)
 
 
     # next button
     step_2_form_control_confirm_button = driver.find_element_by_id("step_2_form_control_confirm")
-    driver.execute_script("arguments[0].click();", step_2_form_control_confirm_button)
+    tryClickElement(driver, step_2_form_control_confirm_button)
 
     # wait
     waitUntilFinalPage(driver)
 
-    # # # final page
-    # trySolveRecaptcha(driver)
-
-
     time.sleep(99999)
 
 
-main()
+
+def setSchedule():
+    print("setting schedule")
+    # schedule.every().monday.at("09:33").do(process_main)
+
+
+def initRecaptcahWorker():
+
+    recaptcha_worker_limit = 5
+
+    for i in range(recaptcha_worker_limit):
+        proc = Process(target=recaptchaWorker, args=(recaptcha_token_list, ))
+        recaptcha_worker_list.append(proc)
+        proc.start()
+
+def main():
+
+    initRecaptcahWorker()
+
+    while True:
+        print("current list : " + str(recaptcha_token_list))
+
+        for token_object in recaptcha_token_list:
+            code = token_object['code']
+            startAt = token_object['startAt']
+            endAt = token_object['endAt']
+            timeSpent = token_object['timeSpent']
+            print(f"timeSpent : {timeSpent}")
+            print(f"startAt : {startAt}")
+            print(f"endAt : {endAt}")
+            print("------")
+        print("==================")
+
+        # token = tryGetRecaptchaToken()
+
+        time.sleep(1)
+
+    # process_main()
+
+    # setSchedule()
+    # while True:
+    #     # Checks whether a scheduled task 
+    #     # is pending to run or not
+    #     schedule.run_pending()
+    #     time.sleep(1)
+
+
+if __name__ == '__main__':   
+
+    # global variables here
+    manager = Manager()
+    recaptcha_token_list = manager.list()
+
+
+    main()
